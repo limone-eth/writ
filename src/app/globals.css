@@ -1,0 +1,302 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------- tokens */
+
+:root {
+  color-scheme: light;
+
+  --paper: #fbfaf8;
+  --paper-raised: #ffffff;
+  --ink: #16150f;
+  --ink-soft: #4a483f;
+  --ink-faint: #7c796e;
+  --rule: #e6e3db;
+  --rule-soft: #efece5;
+  --accent: #a8401b;
+  --selection: #f0e7d8;
+  --edge: oklch(0 0 0 / 0.1);
+  --shadow: 0 1px 2px rgb(22 21 15 / 0.05), 0 10px 28px -14px rgb(22 21 15 / 0.18);
+
+  --font-ui: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
+  --font-reading: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
+
+  --measure: 35rem;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --paper: #100f0d;
+  --paper-raised: #191815;
+  --ink: #eceae3;
+  --ink-soft: #a5a298;
+  --ink-faint: #7a776d;
+  --rule: #2a2823;
+  --rule-soft: #201f1b;
+  --accent: #e88b5c;
+  --selection: #322d24;
+  --edge: oklch(1 0 0 / 0.1);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --paper: #100f0d;
+    --paper-raised: #191815;
+    --ink: #eceae3;
+    --ink-soft: #a5a298;
+    --ink-faint: #7a776d;
+    --rule: #2a2823;
+    --rule-soft: #201f1b;
+    --accent: #e88b5c;
+    --selection: #322d24;
+    --edge: oklch(1 0 0 / 0.1);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+  }
+}
+
+/* ------------------------------------------------------- reading fonts */
+
+:root[data-font="lato"]  { --font-reading: var(--font-lato), ui-sans-serif, system-ui, sans-serif; }
+:root[data-font="arial"] { --font-reading: Arial, "Helvetica Neue", Helvetica, sans-serif; }
+:root[data-font="system"]{ --font-reading: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+:root[data-font="serif"] { --font-reading: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif; }
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-accent: var(--accent);
+  --color-edge: var(--edge);
+
+  --font-ui: var(--font-ui);
+  --font-reading: var(--font-reading);
+
+  /* Stronger than the built-ins; the CSS defaults lack punch. */
+  --ease-snap: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-glide: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* ----------------------------------------------------------------- base */
+/* These MUST stay inside @layer base. Unlayered rules outrank every
+   utility, so an unlayered `color: inherit` here silently beat `text-paper`
+   and painted dark labels onto dark buttons. */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: var(--selection);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  input,
+  textarea,
+  button,
+  select {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+
+  p, li {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --------------------------------------------------------- components */
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Extends a small control to a 44px touch target without moving it. */
+  .hit {
+    position: relative;
+  }
+  .hit::after {
+    content: "";
+    position: absolute;
+    inset: 50% 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  .prose {
+    font-family: var(--font-reading);
+    font-size: var(--reading-size, 1.125rem);
+    line-height: 1.72;
+    color: var(--ink);
+    overflow-wrap: break-word;
+  }
+
+  .prose > * + * { margin-top: 1.35em; }
+
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    margin-top: 2.2em;
+    margin-bottom: -0.55em;
+  }
+  .prose h1 { font-size: 1.6em; }
+  .prose h2 { font-size: 1.32em; }
+  .prose h3 { font-size: 1.12em; }
+  .prose h4 { font-size: 1em; }
+
+  .prose a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: color 150ms var(--ease-snap), text-decoration-color 150ms var(--ease-snap);
+  }
+  .prose a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+  .prose strong { font-weight: 700; }
+  .prose em { font-style: italic; }
+
+  .prose blockquote {
+    border-left: 1px solid var(--rule);
+    padding-left: 1.1em;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .prose ul, .prose ol { padding-left: 1.4em; }
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
+  .prose li { margin-top: 0.4em; }
+  .prose li::marker { color: var(--ink-faint); }
+
+  .prose code {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    font-size: 0.86em;
+    background: var(--rule-soft);
+    border-radius: 4px;
+    padding: 0.12em 0.34em;
+  }
+
+  .prose pre {
+    background: var(--rule-soft);
+    border-radius: 10px;
+    padding: 1em 1.1em;
+    overflow-x: auto;
+    font-size: 0.86em;
+    line-height: 1.6;
+  }
+  .prose pre code { background: none; padding: 0; font-size: 1em; }
+
+  .prose hr {
+    border: 0;
+    height: 1px;
+    background: var(--rule);
+    margin: 2.6em 0;
+  }
+
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    outline: 1px solid var(--edge);
+    outline-offset: -1px;
+  }
+
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.94em;
+  }
+  .prose th, .prose td {
+    border: 1px solid var(--rule);
+    padding: 0.5em 0.7em;
+    text-align: left;
+  }
+  .prose th { background: var(--rule-soft); font-weight: 600; }
+
+  .prose-scroll { overflow-x: auto; }
+
+  /* The editor IS the preview: it renders through .prose, so what you type
+     is laid out exactly as the published article lays it out. */
+  .writing-body {
+    outline: none;
+    min-height: 55dvh;
+    caret-color: var(--accent);
+  }
+
+  .writing-body p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--ink-faint);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /* Markdown shorthand still works, it just resolves as you type. */
+  .writing-body a { cursor: text; }
+  .writing-body:focus-visible { outline: none; }
+
+  .fade-chrome {
+    transition: opacity 320ms var(--ease-snap);
+  }
+  .fade-chrome[data-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* ----------------------------------------------------------- keyframes */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.rise { animation: rise 420ms var(--ease-snap) both; }
+
+/* Popovers scale from their trigger, never from the middle of the page. */
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.pop { animation: pop 160ms var(--ease-snap) both; }
