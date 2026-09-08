@@ -200,6 +200,9 @@
     font-style: italic;
   }
 
+  /* Anchored headings land below the sticky header. */
+  .prose :is(h1, h2, h3)[id] { scroll-margin-top: 5rem; }
+
   /* boxed callout: a quote that reads as an aside rather than a citation */
   .prose blockquote[data-kind="card"] {
     border: 1px solid var(--rule);
@@ -308,3 +311,27 @@
   to   { opacity: 1; transform: none; }
 }
 .pop { animation: pop 160ms var(--ease-snap) both; }
+
+/* ---------------------------------------------------------- outline */
+
+/* The outline column is a container so the outline can hide itself when
+   the article is wide and there is no room beside it. */
+.toc-col { container-type: inline-size; }
+@container (max-width: 12rem) {
+  .toc { display: none; }
+}
+
+.toc-marker {
+  position: absolute;
+  left: -1.5px;
+  top: 6px;
+  width: 2px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: transform 90ms linear, opacity 200ms;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toc-marker { transition: none; }
+}

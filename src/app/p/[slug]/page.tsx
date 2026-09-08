@@ -8,6 +8,8 @@ import SiteHeader from "@/components/SiteHeader";
 import Markdown from "@/components/Markdown";
 import ReadingProgress from "@/components/ReadingProgress";
 import { presentationVars } from "@/lib/presentation";
+import { headingsOf } from "@/lib/toc";
+import Toc from "@/components/Toc";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,8 @@ export default async function ArticlePage({ params }: Params) {
 
   const { older, newer } = await neighbours(post);
   const date = post.published_at ?? post.created_at;
+  const toc = headingsOf(post.content);
+  const showToc = toc.length >= 2;
 
   return (
     // The writer's typeface, size and measure travel with the post.
@@ -38,74 +42,93 @@ export default async function ArticlePage({ params }: Params) {
       <ReadingProgress />
       <SiteHeader authed={authed} back={{ href: "/", label: "All writing" }} />
 
-      <main className="mx-auto max-w-[var(--measure)] px-5 pb-24 sm:px-0">
-        <article className="rise">
-          <header className="py-12 sm:py-16">
-            {!post.published && (
-              <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-rule bg-rule-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-faint">
-                Draft preview
-              </div>
-            )}
-
-            <h1 className="font-reading text-[30px] font-bold leading-[1.15] tracking-[-0.022em] text-ink sm:text-[38px]">
-              {post.title || "Untitled"}
-            </h1>
-
-            {post.subtitle && (
-              <p className="font-reading mt-3 text-[17px] leading-relaxed text-ink-soft sm:text-[19px]">
-                {post.subtitle}
-              </p>
-            )}
-
-            <div className="mt-6 flex items-center gap-2 text-[12px] text-ink-faint tabular">
-              <time dateTime={date}>{formatDate(date)}</time>
-              <span aria-hidden="true">·</span>
-              <span>{readingTime(post.content)} min read</span>
-              {authed && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <Link href={`/admin/${post.id}`} className="transition-colors hover:text-ink">
-                    Edit
-                  </Link>
-                </>
-              )}
+      {/* Three columns on wide screens: outline | article | spacer. The side
+          columns absorb leftover space; the outline hides itself when its
+          column gets too narrow to hold it. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_min(var(--measure),100%)_minmax(0,1fr)]">
+        {showToc && (
+          <aside className="toc-col hidden lg:block">
+            <div className="sticky top-24 ml-auto max-w-[13rem] pr-10 pt-12 sm:pt-16">
+              <Toc items={toc} />
             </div>
-          </header>
-
-          <div className="prose pb-4">
-            <Markdown>{post.content}</Markdown>
-          </div>
-        </article>
-
-        {(older || newer) && (
-          <nav className="mt-16 grid gap-3 border-t border-rule-soft pt-8 sm:grid-cols-2">
-            {newer ? (
-              <Link
-                href={`/p/${newer.slug}`}
-                className="group rounded-lg border border-rule p-4 transition-colors duration-150 hover:border-ink-faint"
-              >
-                <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-ink-faint">Newer</div>
-                <div className="text-[14px] font-semibold leading-snug text-ink transition-colors group-hover:text-accent">
-                  {newer.title || "Untitled"}
-                </div>
-              </Link>
-            ) : (
-              <span className="hidden sm:block" />
-            )}
-            {older && (
-              <Link
-                href={`/p/${older.slug}`}
-                className="group rounded-lg border border-rule p-4 transition-colors duration-150 hover:border-ink-faint sm:text-right"
-              >
-                <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-ink-faint">Older</div>
-                <div className="text-[14px] font-semibold leading-snug text-ink transition-colors group-hover:text-accent">
-                  {older.title || "Untitled"}
-                </div>
-              </Link>
-            )}
-          </nav>
+          </aside>
         )}
-      </main>
+        <main className="mx-auto w-full max-w-[var(--measure)] px-5 pb-24 sm:px-0 lg:col-start-2">
+          <article className="rise">
+            <header className="py-12 sm:py-16">
+              {!post.published && (
+                <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-rule bg-rule-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-faint">
+                  Draft preview
+                </div>
+              )}
+
+              <h1 className="font-reading text-[30px] font-bold leading-[1.15] tracking-[-0.022em] text-ink sm:text-[38px]">
+                {post.title || "Untitled"}
+              </h1>
+
+              {post.subtitle && (
+                <p className="font-reading mt-3 text-[17px] leading-relaxed text-ink-soft sm:text-[19px]">
+                  {post.subtitle}
+                </p>
+              )}
+
+              <div className="mt-6 flex items-center gap-2 text-[12px] text-ink-faint tabular">
+                <time dateTime={date}>{formatDate(date)}</time>
+                <span aria-hidden="true">·</span>
+                <span>{readingTime(post.content)} min read</span>
+                {authed && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <Link
+                      href={`/admin/${post.id}`}
+                      className="transition-colors hover:text-ink"
+                    >
+                      Edit
+                    </Link>
+                  </>
+                )}
+              </div>
+            </header>
+
+            <div className="prose pb-4">
+              <Markdown>{post.content}</Markdown>
+            </div>
+          </article>
+
+          {(older || newer) && (
+            <nav className="mt-16 grid gap-3 border-t border-rule-soft pt-8 sm:grid-cols-2">
+              {newer ? (
+                <Link
+                  href={`/p/${newer.slug}`}
+                  className="group rounded-lg border border-rule p-4 transition-colors duration-150 hover:border-ink-faint"
+                >
+                  <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-ink-faint">
+                    Newer
+                  </div>
+                  <div className="text-[14px] font-semibold leading-snug text-ink transition-colors group-hover:text-accent">
+                    {newer.title || "Untitled"}
+                  </div>
+                </Link>
+              ) : (
+                <span className="hidden sm:block" />
+              )}
+              {older && (
+                <Link
+                  href={`/p/${older.slug}`}
+                  className="group rounded-lg border border-rule p-4 transition-colors duration-150 hover:border-ink-faint sm:text-right"
+                >
+                  <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-ink-faint">
+                    Older
+                  </div>
+                  <div className="text-[14px] font-semibold leading-snug text-ink transition-colors group-hover:text-accent">
+                    {older.title || "Untitled"}
+                  </div>
+                </Link>
+              )}
+            </nav>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
