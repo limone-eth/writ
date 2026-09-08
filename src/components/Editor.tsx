@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { EditorContent, useEditor, useEditorState, type Editor as TipTapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -35,6 +44,7 @@ export default function Editor({ post }: { post: Post }) {
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<TipTapEditor | null>(null);
   const linkInput = useRef<HTMLInputElement>(null);
+  const subtitleInput = useRef<HTMLTextAreaElement>(null);
 
   const titleRef = useRef(title);
   const subtitleRef = useRef(subtitle);
@@ -272,27 +282,28 @@ export default function Editor({ post }: { post: Post }) {
 
       {/* writing surface */}
       <main className="mx-auto max-w-[var(--measure)] px-5 pt-24">
-        <input
+        <GrowingField
           value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
+          onChange={(v) => {
+            setTitle(v);
             touch();
           }}
+          onEnter={() => subtitleInput.current?.focus()}
           placeholder="Title"
           aria-label="Title"
           className="w-full bg-transparent text-[30px] font-bold leading-[1.15] tracking-[-0.022em] outline-none placeholder:text-ink-faint sm:text-[38px]"
-          style={{ fontFamily: "var(--font-reading)" }}
         />
-        <input
+        <GrowingField
+          ref={subtitleInput}
           value={subtitle}
-          onChange={(e) => {
-            setSubtitle(e.target.value);
+          onChange={(v) => {
+            setSubtitle(v);
             touch();
           }}
+          onEnter={() => editor?.commands.focus("start")}
           placeholder="Subtitle (optional)"
           aria-label="Subtitle"
-          className="mt-3 w-full bg-transparent text-[17px] leading-relaxed text-ink-soft outline-none placeholder:text-ink-faint"
-          style={{ fontFamily: "var(--font-reading)" }}
+          className="mt-3 w-full bg-transparent text-[17px] leading-relaxed text-ink-soft outline-none placeholder:text-ink-faint sm:text-[19px]"
         />
 
         <EditorContent editor={editor} className="mt-10" />
@@ -565,3 +576,49 @@ function ThemeIcon({ dark }: { dark: boolean }) {
     </span>
   );
 }
+
+/* ------------------------------------------------------------ fields */
+
+/**
+ * Single-value text field that wraps and grows with its content, so a long
+ * title reads the way it will on the published page instead of scrolling
+ * off the right edge. Enter never inserts a newline; it hands focus on.
+ */
+const GrowingField = forwardRef<
+  HTMLTextAreaElement,
+  Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> & {
+    value: string;
+    onChange: (value: string) => void;
+    onEnter?: () => void;
+  }
+>(function GrowingField({ value, onChange, onEnter, className, style, ...rest }, ref) {
+  const inner = useRef<HTMLTextAreaElement>(null);
+  useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
+
+  // Re-measure whenever the text or the reading font changes.
+  const { font, size } = usePrefs();
+  useLayoutEffect(() => {
+    const el = inner.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, font, size]);
+
+  return (
+    <textarea
+      ref={inner}
+      rows={1}
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/[\r\n]+/g, " "))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onEnter?.();
+        }
+      }}
+      className={["block resize-none overflow-hidden", className].join(" ")}
+      style={{ fontFamily: "var(--font-reading)", ...style }}
+      {...rest}
+    />
+  );
+});
