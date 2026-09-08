@@ -85,7 +85,7 @@ export default function Editor({ post }: { post: Post }) {
     immediatelyRender: false, // required under SSR
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2, 3] },
+        heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, autolink: true },
       }),
       Markdown.configure({
@@ -124,7 +124,7 @@ export default function Editor({ post }: { post: Post }) {
         ? {
             bold: e.isActive("bold"),
             italic: e.isActive("italic"),
-            h2: e.isActive("heading", { level: 2 }),
+            heading: ([1, 2, 3] as const).find((level) => e.isActive("heading", { level })) ?? null,
             quote: e.isActive("blockquote"),
             list: e.isActive("bulletList"),
             code: e.isActive("code"),
@@ -359,13 +359,18 @@ export default function Editor({ post }: { post: Post }) {
               <Tool label="Link" active={live?.link} onClick={openLink}>
                 <LinkIcon />
               </Tool>
-              <Tool
-                label="Heading"
-                active={live?.h2}
-                onClick={cmd(() => editor?.chain().focus().toggleHeading({ level: 2 }).run())}
-              >
-                H
-              </Tool>
+              {([1, 2, 3] as const).map((level) => (
+                <Tool
+                  key={level}
+                  label={`Heading ${level}`}
+                  active={live?.heading === level}
+                  onClick={cmd(() => editor?.chain().focus().toggleHeading({ level }).run())}
+                >
+                  <span className="text-[12px] font-semibold">
+                    H<sub className="text-[9px]">{level}</sub>
+                  </span>
+                </Tool>
+              ))}
               <Tool label="Quote" active={live?.quote} onClick={cmd(() => editor?.chain().focus().toggleBlockquote().run())}>
                 <QuoteIcon />
               </Tool>
