@@ -1,10 +1,11 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkCallout from "@/lib/remark-callout";
 
 export default function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkCallout]}
       components={{
         a: ({ href, children, ...rest }) => {
           const external = !!href && /^https?:\/\//i.test(href);

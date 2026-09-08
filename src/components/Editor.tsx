@@ -15,6 +15,7 @@ import { EditorContent, useEditor, useEditorState, type Editor as TipTapEditor }
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder, CharacterCount } from "@tiptap/extensions";
 import { Markdown } from "tiptap-markdown";
+import { Callout } from "./Callout";
 import { deletePost, savePost, setPublished } from "@/lib/actions";
 import { FONTS, SIZES, usePrefs } from "./prefs";
 import type { Post } from "@/lib/db";
@@ -87,7 +88,9 @@ export default function Editor({ post }: { post: Post }) {
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, autolink: true },
+        blockquote: false, // replaced by Callout below
       }),
+      Callout,
       Markdown.configure({
         html: false,
         transformPastedText: true,
@@ -125,7 +128,8 @@ export default function Editor({ post }: { post: Post }) {
             bold: e.isActive("bold"),
             italic: e.isActive("italic"),
             heading: ([1, 2, 3] as const).find((level) => e.isActive("heading", { level })) ?? null,
-            quote: e.isActive("blockquote"),
+            quote: e.isActive("blockquote", { kind: "quote" }),
+            card: e.isActive("blockquote", { kind: "card" }),
             list: e.isActive("bulletList"),
             code: e.isActive("code"),
             link: e.isActive("link"),
@@ -371,8 +375,11 @@ export default function Editor({ post }: { post: Post }) {
                   </span>
                 </Tool>
               ))}
-              <Tool label="Quote" active={live?.quote} onClick={cmd(() => editor?.chain().focus().toggleBlockquote().run())}>
+              <Tool label="Quote" active={live?.quote} onClick={cmd(() => editor?.chain().focus().toggleQuote("quote").run())}>
                 <QuoteIcon />
+              </Tool>
+              <Tool label="Callout" active={live?.card} onClick={cmd(() => editor?.chain().focus().toggleQuote("card").run())}>
+                <CalloutIcon />
               </Tool>
               <Tool label="List" active={live?.list} onClick={cmd(() => editor?.chain().focus().toggleBulletList().run())}>
                 <ListIcon />
@@ -471,6 +478,7 @@ function Tool({
     <button
       type="button"
       onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()} // keep the editor focused and the selection intact
       title={label}
       aria-label={label}
       aria-pressed={active ?? false}
@@ -520,6 +528,15 @@ function QuoteIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function CalloutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 10.5h8M8 14h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

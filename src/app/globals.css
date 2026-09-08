@@ -204,6 +204,18 @@
     font-style: italic;
   }
 
+  /* boxed callout: a quote that reads as an aside rather than a citation */
+  .prose blockquote[data-kind="card"] {
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 0.95em 1.15em;
+    background: var(--paper-raised);
+    color: var(--ink);
+    font-style: normal;
+    font-size: 0.94em;
+  }
+  .prose blockquote[data-kind="card"] > * + * { margin-top: 0.85em; }
+
   .prose ul, .prose ol { padding-left: 1.4em; }
   .prose ul { list-style: disc; }
   .prose ol { list-style: decimal; }
