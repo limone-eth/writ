@@ -11,15 +11,30 @@ import {
   useTransition,
 } from "react";
 import Link from "next/link";
-import { EditorContent, useEditor, useEditorState, type Editor as TipTapEditor } from "@tiptap/react";
+import {
+  EditorContent,
+  useEditor,
+  useEditorState,
+  type Editor as TipTapEditor,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder, CharacterCount } from "@tiptap/extensions";
 import { Markdown } from "tiptap-markdown";
 import { Callout } from "./Callout";
 import { deletePost, savePost, setPublished } from "@/lib/actions";
 import { usePrefs } from "./prefs";
-import { FONTS, SIZES, WIDTHS, presentationVars, type FontId, type SizeId, type WidthId } from "@/lib/presentation";
+import {
+  FONTS,
+  SIZES,
+  WIDTHS,
+  presentationVars,
+  type FontId,
+  type SizeId,
+  type WidthId,
+} from "@/lib/presentation";
 import type { Post } from "@/lib/db";
+import Toc from "./Toc";
+import type { TocItem } from "@/lib/toc";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -120,7 +135,9 @@ export default function Editor({ post }: { post: Post }) {
         linkify: true,
         breaks: false,
       }),
-      Placeholder.configure({ placeholder: "Start writing. Markdown becomes formatting as you type." }),
+      Placeholder.configure({
+        placeholder: "Start writing. Markdown becomes formatting as you type.",
+      }),
       CharacterCount,
     ],
     content: post.content,
@@ -149,7 +166,10 @@ export default function Editor({ post }: { post: Post }) {
         ? {
             bold: e.isActive("bold"),
             italic: e.isActive("italic"),
-            heading: ([1, 2, 3] as const).find((level) => e.isActive("heading", { level })) ?? null,
+            heading:
+              ([1, 2, 3] as const).find((level) =>
+                e.isActive("heading", { level }),
+              ) ?? null,
             quote: e.isActive("blockquote", { kind: "quote" }),
             card: e.isActive("blockquote", { kind: "card" }),
             list: e.isActive("bulletList"),
@@ -158,6 +178,48 @@ export default function Editor({ post }: { post: Post }) {
           }
         : null,
   });
+
+  // Outline of the live document, refreshed on document changes only.
+  // Entries are matched to DOM headings by order, since editor headings
+  // carry no ids.
+  const [outline, setOutline] = useState<TocItem[]>([]);
+  useEffect(() => {
+    if (!editor) return;
+    const compute = () => {
+      const items: TocItem[] = [];
+      editor.state.doc.descendants((node) => {
+        if (
+          node.type.name === "heading" &&
+          node.attrs.level <= 3 &&
+          node.textContent.trim()
+        ) {
+          items.push({
+            id: `h-${items.length}`,
+            text: node.textContent.trim(),
+            level: node.attrs.level,
+          });
+        }
+      });
+      setOutline((prev) =>
+        prev.length === items.length &&
+        prev.every(
+          (p, i) => p.text === items[i].text && p.level === items[i].level,
+        )
+          ? prev
+          : items,
+      );
+    };
+    compute();
+    editor.on("update", compute);
+    return () => {
+      editor.off("update", compute);
+    };
+  }, [editor]);
+  const headingElement = useCallback(
+    (_: TocItem, i: number) =>
+      editor?.view.dom.querySelectorAll<HTMLElement>("h1, h2, h3")[i] ?? null,
+    [editor],
+  );
 
   /* ------------------------------------------------------- global keys */
 
@@ -246,9 +308,15 @@ export default function Editor({ post }: { post: Post }) {
   };
 
   return (
-    <div className="min-h-dvh pb-40" style={presentationVars({ font, size, width })}>
+    <div
+      className="min-h-dvh pb-40"
+      style={presentationVars({ font, size, width })}
+    >
       {/* top bar */}
-      <div className="fade-chrome fixed inset-x-0 top-0 z-40 bg-paper/85 backdrop-blur-md" data-hidden={chromeHidden}>
+      <div
+        className="fade-chrome fixed inset-x-0 top-0 z-40 bg-paper/85 backdrop-blur-md"
+        data-hidden={chromeHidden}
+      >
         <div className="mx-auto flex h-14 max-w-[var(--measure)] items-center justify-between gap-3 px-5">
           <Link
             href="/admin"
@@ -297,45 +365,66 @@ export default function Editor({ post }: { post: Post }) {
               className={[
                 "h-8 rounded-full px-3.5 text-[13px] font-semibold transition-[transform,opacity] duration-150 ease-snap",
                 "active:scale-[0.96] hover:opacity-90 disabled:opacity-50 disabled:active:scale-100",
-                published ? "border border-rule text-ink-soft" : "bg-ink text-paper",
+                published
+                  ? "border border-rule text-ink-soft"
+                  : "bg-ink text-paper",
               ].join(" ")}
             >
-              {pending ? (published ? "Unpublishing…" : "Publishing…") : published ? "Unpublish" : "Publish"}
+              {pending
+                ? published
+                  ? "Unpublishing…"
+                  : "Publishing…"
+                : published
+                  ? "Unpublish"
+                  : "Publish"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* writing surface */}
-      <main className="mx-auto max-w-[var(--measure)] px-5 pt-24">
-        <GrowingField
-          value={title}
-          onChange={(v) => {
-            setTitle(v);
-            touch();
-          }}
-          onEnter={() => subtitleInput.current?.focus()}
-          measureKey={`${font}/${width}`}
-          placeholder="Title"
-          aria-label="Title"
-          className="w-full bg-transparent text-[30px] font-bold leading-[1.15] tracking-[-0.022em] outline-none placeholder:text-ink-faint sm:text-[38px]"
-        />
-        <GrowingField
-          ref={subtitleInput}
-          value={subtitle}
-          onChange={(v) => {
-            setSubtitle(v);
-            touch();
-          }}
-          onEnter={() => editor?.commands.focus("start")}
-          measureKey={`${font}/${width}`}
-          placeholder="Subtitle (optional)"
-          aria-label="Subtitle"
-          className="mt-3 w-full bg-transparent text-[17px] leading-relaxed text-ink-soft outline-none placeholder:text-ink-faint sm:text-[19px]"
-        />
+      {/* writing surface, with the outline beside it where there is room */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_min(var(--measure),100%)_minmax(0,1fr)]">
+        {outline.length >= 2 && (
+          <aside className="toc-col hidden lg:block">
+            <div className="sticky top-24 ml-auto max-w-[13rem] pr-10 pt-24">
+              <Toc
+                items={outline}
+                elementFor={headingElement}
+                linkable={false}
+              />
+            </div>
+          </aside>
+        )}
+        <main className="mx-auto w-full max-w-[var(--measure)] px-5 pt-24 lg:col-start-2">
+          <GrowingField
+            value={title}
+            onChange={(v) => {
+              setTitle(v);
+              touch();
+            }}
+            onEnter={() => subtitleInput.current?.focus()}
+            measureKey={`${font}/${width}`}
+            placeholder="Title"
+            aria-label="Title"
+            className="w-full bg-transparent text-[30px] font-bold leading-[1.15] tracking-[-0.022em] outline-none placeholder:text-ink-faint sm:text-[38px]"
+          />
+          <GrowingField
+            ref={subtitleInput}
+            value={subtitle}
+            onChange={(v) => {
+              setSubtitle(v);
+              touch();
+            }}
+            onEnter={() => editor?.commands.focus("start")}
+            measureKey={`${font}/${width}`}
+            placeholder="Subtitle (optional)"
+            aria-label="Subtitle"
+            className="mt-3 w-full bg-transparent text-[17px] leading-relaxed text-ink-soft outline-none placeholder:text-ink-faint sm:text-[19px]"
+          />
 
-        <EditorContent editor={editor} className="mt-10" />
-      </main>
+          <EditorContent editor={editor} className="mt-10" />
+        </main>
+      </div>
 
       {/* bottom bar */}
       <div
@@ -378,10 +467,20 @@ export default function Editor({ post }: { post: Post }) {
             </div>
           ) : (
             <div className="flex items-center gap-1 overflow-x-auto px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <Tool label="Bold" active={live?.bold} onClick={cmd(() => editor?.chain().focus().toggleBold().run())}>
+              <Tool
+                label="Bold"
+                active={live?.bold}
+                onClick={cmd(() => editor?.chain().focus().toggleBold().run())}
+              >
                 <span className="font-bold">B</span>
               </Tool>
-              <Tool label="Italic" active={live?.italic} onClick={cmd(() => editor?.chain().focus().toggleItalic().run())}>
+              <Tool
+                label="Italic"
+                active={live?.italic}
+                onClick={cmd(() =>
+                  editor?.chain().focus().toggleItalic().run(),
+                )}
+              >
                 <span className="italic">I</span>
               </Tool>
               <Tool label="Link" active={live?.link} onClick={openLink}>
@@ -392,23 +491,47 @@ export default function Editor({ post }: { post: Post }) {
                   key={level}
                   label={`Heading ${level}`}
                   active={live?.heading === level}
-                  onClick={cmd(() => editor?.chain().focus().toggleHeading({ level }).run())}
+                  onClick={cmd(() =>
+                    editor?.chain().focus().toggleHeading({ level }).run(),
+                  )}
                 >
                   <span className="text-[12px] font-semibold">
                     H<sub className="text-[9px]">{level}</sub>
                   </span>
                 </Tool>
               ))}
-              <Tool label="Quote" active={live?.quote} onClick={cmd(() => editor?.chain().focus().toggleQuote("quote").run())}>
+              <Tool
+                label="Quote"
+                active={live?.quote}
+                onClick={cmd(() =>
+                  editor?.chain().focus().toggleQuote("quote").run(),
+                )}
+              >
                 <QuoteIcon />
               </Tool>
-              <Tool label="Callout" active={live?.card} onClick={cmd(() => editor?.chain().focus().toggleQuote("card").run())}>
+              <Tool
+                label="Callout"
+                active={live?.card}
+                onClick={cmd(() =>
+                  editor?.chain().focus().toggleQuote("card").run(),
+                )}
+              >
                 <CalloutIcon />
               </Tool>
-              <Tool label="List" active={live?.list} onClick={cmd(() => editor?.chain().focus().toggleBulletList().run())}>
+              <Tool
+                label="List"
+                active={live?.list}
+                onClick={cmd(() =>
+                  editor?.chain().focus().toggleBulletList().run(),
+                )}
+              >
                 <ListIcon />
               </Tool>
-              <Tool label="Code" active={live?.code} onClick={cmd(() => editor?.chain().focus().toggleCode().run())}>
+              <Tool
+                label="Code"
+                active={live?.code}
+                onClick={cmd(() => editor?.chain().focus().toggleCode().run())}
+              >
                 <span className="font-mono text-[12px]">{"</>"}</span>
               </Tool>
 
@@ -423,7 +546,9 @@ export default function Editor({ post }: { post: Post }) {
                   style={{ fontFamily: f.stack }}
                   className={[
                     "h-8 shrink-0 rounded-lg px-2.5 text-[13px] transition-[color,background-color,transform] duration-150 ease-snap active:scale-[0.96]",
-                    font === f.id ? "bg-ink text-paper" : "text-ink-faint hover:bg-rule-soft hover:text-ink",
+                    font === f.id
+                      ? "bg-ink text-paper"
+                      : "text-ink-faint hover:bg-rule-soft hover:text-ink",
                   ].join(" ")}
                 >
                   {f.label}
@@ -459,19 +584,27 @@ export default function Editor({ post }: { post: Post }) {
               </select>
 
               <Tool
-                label={resolvedTheme === "dark" ? "Switch to light" : "Switch to dark"}
+                label={
+                  resolvedTheme === "dark"
+                    ? "Switch to light"
+                    : "Switch to dark"
+                }
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               >
                 <ThemeIcon dark={resolvedTheme === "dark"} />
               </Tool>
 
               <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
-                <span className="text-[12px] text-ink-faint tabular">{words}w</span>
+                <span className="text-[12px] text-ink-faint tabular">
+                  {words}w
+                </span>
                 {confirmDelete ? (
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => startTransition(() => void deletePost(post.id))}
+                      onClick={() =>
+                        startTransition(() => void deletePost(post.id))
+                      }
                       className="h-8 rounded-lg px-2 text-[12px] font-semibold text-accent transition-transform duration-150 ease-snap hover:bg-rule-soft active:scale-[0.96]"
                     >
                       Delete for good
@@ -485,7 +618,10 @@ export default function Editor({ post }: { post: Post }) {
                     </button>
                   </div>
                 ) : (
-                  <Tool label="Delete post" onClick={() => setConfirmDelete(true)}>
+                  <Tool
+                    label="Delete post"
+                    onClick={() => setConfirmDelete(true)}
+                  >
                     <TrashIcon />
                   </Tool>
                 )}
@@ -522,7 +658,9 @@ function Tool({
       className={[
         "hit flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[13px]",
         "transition-[color,background-color,transform] duration-150 ease-snap active:scale-[0.96]",
-        active ? "bg-ink text-paper" : "text-ink-faint hover:bg-rule-soft hover:text-ink",
+        active
+          ? "bg-ink text-paper"
+          : "text-ink-faint hover:bg-rule-soft hover:text-ink",
       ].join(" ")}
     >
       {children}
@@ -536,15 +674,33 @@ function Divider() {
 
 function Chevron() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M15 18l-6-6 6-6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
 function LinkIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M10 13a5 5 0 007.07 0l2-2a5 5 0 10-7.07-7.07L11 4.93M14 11a5 5 0 00-7.07 0l-2 2a5 5 0 107.07 7.07L13 19.07"
         stroke="currentColor"
@@ -557,7 +713,13 @@ function LinkIcon() {
 
 function QuoteIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M9 7H5.5A1.5 1.5 0 004 8.5V12h5V7zm0 0v4c0 3.5-1.7 5.4-4 6M20 7h-3.5A1.5 1.5 0 0015 8.5V12h5V7zm0 0v4c0 3.5-1.7 5.4-4 6"
         stroke="currentColor"
@@ -571,24 +733,60 @@ function QuoteIcon() {
 
 function CalloutIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="3.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 10.5h8M8 14h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="3"
+        y="5"
+        width="18"
+        height="14"
+        rx="3.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M8 10.5h8M8 14h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 function ListIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 function TrashIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"
         stroke="currentColor"
@@ -611,7 +809,11 @@ function ThemeIcon({ dark }: { dark: boolean }) {
         fill="none"
         aria-hidden="true"
         className="absolute inset-0 transition-[opacity,transform,filter] duration-300 ease-snap"
-        style={{ opacity: dark ? 1 : 0, transform: dark ? "none" : "scale(0.25)", filter: dark ? "none" : "blur(4px)" }}
+        style={{
+          opacity: dark ? 1 : 0,
+          transform: dark ? "none" : "scale(0.25)",
+          filter: dark ? "none" : "blur(4px)",
+        }}
       >
         <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
         <path
@@ -628,9 +830,18 @@ function ThemeIcon({ dark }: { dark: boolean }) {
         fill="none"
         aria-hidden="true"
         className="absolute inset-0 transition-[opacity,transform,filter] duration-300 ease-snap"
-        style={{ opacity: dark ? 0 : 1, transform: dark ? "scale(0.25)" : "none", filter: dark ? "blur(4px)" : "none" }}
+        style={{
+          opacity: dark ? 0 : 1,
+          transform: dark ? "scale(0.25)" : "none",
+          filter: dark ? "blur(4px)" : "none",
+        }}
       >
-        <path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path
+          d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
       </svg>
     </span>
   );
@@ -645,14 +856,20 @@ function ThemeIcon({ dark }: { dark: boolean }) {
  */
 const GrowingField = forwardRef<
   HTMLTextAreaElement,
-  Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> & {
+  Omit<
+    React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+    "onChange" | "value"
+  > & {
     value: string;
     onChange: (value: string) => void;
     onEnter?: () => void;
     /** Anything that changes the rendered height without changing the text. */
     measureKey?: string;
   }
->(function GrowingField({ value, onChange, onEnter, measureKey, className, style, ...rest }, ref) {
+>(function GrowingField(
+  { value, onChange, onEnter, measureKey, className, style, ...rest },
+  ref,
+) {
   const inner = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
 

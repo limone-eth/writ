@@ -11,7 +11,17 @@ const READ_LINE = 96;
  * line; the thin marker slides continuously between entries as the reader
  * moves through a section, so it shows position, not just which section.
  */
-export default function Toc({ items }: { items: TocItem[] }) {
+export default function Toc({
+  items,
+  elementFor,
+  linkable = true,
+}: {
+  items: TocItem[];
+  /** How to find a heading's element. Defaults to its id. */
+  elementFor?: (item: TocItem, index: number) => HTMLElement | null;
+  /** Whether clicks should also put the heading's id in the URL. */
+  linkable?: boolean;
+}) {
   const list = useRef<HTMLOListElement>(null);
   const [active, setActive] = useState(0);
   const [markerTop, setMarkerTop] = useState<number | null>(null);
@@ -21,10 +31,15 @@ export default function Toc({ items }: { items: TocItem[] }) {
     let frame = 0;
     let tops: number[] = [];
 
+    const find = (it: TocItem, i: number) =>
+      elementFor ? elementFor(it, i) : document.getElementById(it.id);
+
     const measure = () => {
-      tops = items.map((it) => {
-        const el = document.getElementById(it.id);
-        return el ? el.getBoundingClientRect().top + window.scrollY : Number.POSITIVE_INFINITY;
+      tops = items.map((it, i) => {
+        const el = find(it, i);
+        return el
+          ? el.getBoundingClientRect().top + window.scrollY
+          : Number.POSITIVE_INFINITY;
       });
     };
 
@@ -35,7 +50,9 @@ export default function Toc({ items }: { items: TocItem[] }) {
       for (let k = 0; k < tops.length; k++) if (tops[k] <= y) i = k;
       // A short final section can never reach the reading line; once the
       // page is scrolled to the end, the reader is in it.
-      const atEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      const atEnd =
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 2;
       if (atEnd) i = tops.length - 1;
       const links = list.current?.querySelectorAll<HTMLElement>("a") ?? [];
       const cur = links[i];
@@ -43,8 +60,14 @@ export default function Toc({ items }: { items: TocItem[] }) {
       // Progress through the current section, clamped, maps the marker from
       // this entry towards the next one.
       const start = tops[i];
-      const end = i + 1 < tops.length ? tops[i + 1] : document.documentElement.scrollHeight - window.innerHeight + READ_LINE;
-      const t = end > start ? Math.min(1, Math.max(0, (y - start) / (end - start))) : 0;
+      const end =
+        i + 1 < tops.length
+          ? tops[i + 1]
+          : document.documentElement.scrollHeight -
+            window.innerHeight +
+            READ_LINE;
+      const t =
+        end > start ? Math.min(1, Math.max(0, (y - start) / (end - start))) : 0;
       const next = links[i + 1];
       const from = cur.offsetTop;
       const to = next ? next.offsetTop : cur.offsetTop + cur.offsetHeight - 14;
@@ -73,14 +96,18 @@ export default function Toc({ items }: { items: TocItem[] }) {
       window.removeEventListener("resize", onResize);
       ro.disconnect();
     };
-  }, [items]);
+  }, [items, elementFor]);
 
-  const go = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    const el = document.getElementById(id);
+  const go = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    it: TocItem,
+    i: number,
+  ) => {
+    const el = elementFor ? elementFor(it, i) : document.getElementById(it.id);
     if (!el) return;
     e.preventDefault();
     el.scrollIntoView({ behavior: "smooth", block: "start" });
-    history.replaceState(null, "", `#${id}`);
+    if (linkable) history.replaceState(null, "", `#${it.id}`);
   };
 
   // Indent relative to the shallowest level present, so a post that only
@@ -90,25 +117,33 @@ export default function Toc({ items }: { items: TocItem[] }) {
 
   return (
     <nav aria-label="Contents" className="toc">
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-faint">Contents</div>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-faint">
+        Contents
+      </div>
       <div className="relative">
         <span
           aria-hidden="true"
           className="toc-marker"
-          style={markerTop === null ? { opacity: 0 } : { transform: `translateY(${markerTop}px)` }}
+          style={
+            markerTop === null
+              ? { opacity: 0 }
+              : { transform: `translateY(${markerTop}px)` }
+          }
         />
         <ol ref={list} className="border-l border-rule-soft">
           {items.map((it, i) => (
             <li key={it.id}>
               <a
                 href={`#${it.id}`}
-                onClick={(e) => go(e, it.id)}
+                onClick={(e) => go(e, it, i)}
                 aria-current={i === active ? "location" : undefined}
                 className={[
-                  "block py-[5px] pr-2 text-[13px] leading-snug transition-colors duration-150",
+                  "line-clamp-2 block py-[5px] pr-2 text-[13px] leading-snug transition-colors duration-150",
                   indent[it.level - base],
                   it.level === base ? "font-medium" : "",
-                  i === active ? "text-ink" : "text-ink-faint hover:text-ink-soft",
+                  i === active
+                    ? "text-ink"
+                    : "text-ink-faint hover:text-ink-soft",
                 ].join(" ")}
               >
                 {it.text}
