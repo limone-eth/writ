@@ -61,10 +61,6 @@
 
 /* ------------------------------------------------------- reading fonts */
 
-:root[data-font="lato"]  { --font-reading: var(--font-lato), ui-sans-serif, system-ui, sans-serif; }
-:root[data-font="arial"] { --font-reading: Arial, "Helvetica Neue", Helvetica, sans-serif; }
-:root[data-font="system"]{ --font-reading: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-:root[data-font="serif"] { --font-reading: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif; }
 
 @theme inline {
   --color-paper: var(--paper);

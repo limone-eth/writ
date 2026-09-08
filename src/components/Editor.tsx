@@ -17,7 +17,8 @@ import { Placeholder, CharacterCount } from "@tiptap/extensions";
 import { Markdown } from "tiptap-markdown";
 import { Callout } from "./Callout";
 import { deletePost, savePost, setPublished } from "@/lib/actions";
-import { FONTS, SIZES, usePrefs } from "./prefs";
+import { usePrefs } from "./prefs";
+import { FONTS, SIZES, WIDTHS, presentationVars, type FontId, type SizeId, type WidthId } from "@/lib/presentation";
 import type { Post } from "@/lib/db";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -26,7 +27,12 @@ const AUTOSAVE_MS = 900;
 const CHROME_IDLE_MS = 2400;
 
 export default function Editor({ post }: { post: Post }) {
-  const { font, setFont, size, setSize, theme, setTheme, resolvedTheme } = usePrefs();
+  const { theme, setTheme, resolvedTheme } = usePrefs();
+
+  // How the article is set. Saved with the post, so readers see it this way.
+  const [font, setFontState] = useState<FontId>(post.font);
+  const [size, setSizeState] = useState<SizeId>(post.size);
+  const [width, setWidthState] = useState<WidthId>(post.width);
 
   const [title, setTitle] = useState(post.title);
   const [subtitle, setSubtitle] = useState(post.subtitle);
@@ -49,8 +55,10 @@ export default function Editor({ post }: { post: Post }) {
 
   const titleRef = useRef(title);
   const subtitleRef = useRef(subtitle);
+  const lookRef = useRef({ font, size, width });
   titleRef.current = title;
   subtitleRef.current = subtitle;
+  lookRef.current = { font, size, width };
 
   /* ------------------------------------------------------------- saving */
 
@@ -63,6 +71,7 @@ export default function Editor({ post }: { post: Post }) {
       title: titleRef.current,
       subtitle: subtitleRef.current,
       content: editorRef.current?.storage.markdown.getMarkdown() ?? "",
+      ...lookRef.current,
     });
     if (res.ok) {
       setSlug(res.slug);
@@ -79,6 +88,19 @@ export default function Editor({ post }: { post: Post }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), AUTOSAVE_MS);
   }, [flush]);
+
+  const setFont = (f: FontId) => {
+    setFontState(f);
+    touch();
+  };
+  const setSize = (n: SizeId) => {
+    setSizeState(n);
+    touch();
+  };
+  const setWidth = (w: WidthId) => {
+    setWidthState(w);
+    touch();
+  };
 
   /* -------------------------------------------------------- the editor */
 
@@ -224,7 +246,7 @@ export default function Editor({ post }: { post: Post }) {
   };
 
   return (
-    <div className="min-h-dvh pb-40">
+    <div className="min-h-dvh pb-40" style={presentationVars({ font, size, width })}>
       {/* top bar */}
       <div className="fade-chrome fixed inset-x-0 top-0 z-40 bg-paper/85 backdrop-blur-md" data-hidden={chromeHidden}>
         <div className="mx-auto flex h-14 max-w-[var(--measure)] items-center justify-between gap-3 px-5">
@@ -293,6 +315,7 @@ export default function Editor({ post }: { post: Post }) {
             touch();
           }}
           onEnter={() => subtitleInput.current?.focus()}
+          measureKey={`${font}/${width}`}
           placeholder="Title"
           aria-label="Title"
           className="w-full bg-transparent text-[30px] font-bold leading-[1.15] tracking-[-0.022em] outline-none placeholder:text-ink-faint sm:text-[38px]"
@@ -305,6 +328,7 @@ export default function Editor({ post }: { post: Post }) {
             touch();
           }}
           onEnter={() => editor?.commands.focus("start")}
+          measureKey={`${font}/${width}`}
           placeholder="Subtitle (optional)"
           aria-label="Subtitle"
           className="mt-3 w-full bg-transparent text-[17px] leading-relaxed text-ink-soft outline-none placeholder:text-ink-faint sm:text-[19px]"
@@ -410,13 +434,26 @@ export default function Editor({ post }: { post: Post }) {
 
               <select
                 value={size}
-                onChange={(e) => setSize(Number(e.target.value) as (typeof SIZES)[number])}
+                onChange={(e) => setSize(Number(e.target.value) as SizeId)}
                 aria-label="Text size"
                 className="h-8 shrink-0 rounded-lg bg-transparent px-1.5 text-[13px] text-ink-faint outline-none transition-colors duration-150 hover:text-ink"
               >
                 {SIZES.map((s) => (
                   <option key={s} value={s}>
                     {s}px
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={width}
+                onChange={(e) => setWidth(e.target.value as WidthId)}
+                aria-label="Text width"
+                className="h-8 shrink-0 rounded-lg bg-transparent px-1.5 text-[13px] text-ink-faint outline-none transition-colors duration-150 hover:text-ink"
+              >
+                {WIDTHS.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.label}
                   </option>
                 ))}
               </select>
@@ -612,19 +649,20 @@ const GrowingField = forwardRef<
     value: string;
     onChange: (value: string) => void;
     onEnter?: () => void;
+    /** Anything that changes the rendered height without changing the text. */
+    measureKey?: string;
   }
->(function GrowingField({ value, onChange, onEnter, className, style, ...rest }, ref) {
+>(function GrowingField({ value, onChange, onEnter, measureKey, className, style, ...rest }, ref) {
   const inner = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
 
-  // Re-measure whenever the text or the reading font changes.
-  const { font, size } = usePrefs();
+  // Re-measure whenever the text or the article's typography changes.
   useLayoutEffect(() => {
     const el = inner.current;
     if (!el) return;
     el.style.height = "0px";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value, font, size]);
+  }, [value, measureKey]);
 
   return (
     <textarea

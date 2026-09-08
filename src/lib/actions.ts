@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db, ready, getById } from "./db";
 import { checkPassword, createSession, destroySession, requireAuth } from "./auth";
 import { slugify } from "./slug";
+import { normalizePresentation, type Presentation } from "./presentation";
 
 export type LoginState = { error?: string };
 
@@ -59,7 +60,7 @@ export async function savePost(input: {
   title: string;
   subtitle: string;
   content: string;
-}): Promise<SaveResult> {
+} & Partial<Presentation>): Promise<SaveResult> {
   await requireAuth();
   await ready();
   const post = await getById(input.id);
@@ -70,9 +71,16 @@ export async function savePost(input: {
   // Keep the slug stable once published so links never break.
   const slug = post.published ? post.slug : await uniqueSlug(title || `draft-${post.id}`, post.id);
 
+  const look = normalizePresentation({
+    font: input.font ?? post.font,
+    size: input.size ?? post.size,
+    width: input.width ?? post.width,
+  });
+
   await db.execute({
-    sql: `UPDATE posts SET title = ?, subtitle = ?, content = ?, slug = ?, updated_at = ? WHERE id = ?`,
-    args: [title, input.subtitle.trim(), input.content, slug, now, post.id],
+    sql: `UPDATE posts SET title = ?, subtitle = ?, content = ?, slug = ?, font = ?, size = ?, width = ?, updated_at = ?
+          WHERE id = ?`,
+    args: [title, input.subtitle.trim(), input.content, slug, look.font, look.size, look.width, now, post.id],
   });
 
   revalidatePath("/");

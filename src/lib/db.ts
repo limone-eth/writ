@@ -1,4 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
+import { normalizePresentation, type Presentation } from "./presentation";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -32,11 +33,26 @@ const SCHEMA = `
   );
 `;
 
+// Columns added after the first release. SQLite has no ADD COLUMN IF NOT
+// EXISTS, so each is attempted and a "duplicate column" failure is expected.
+const ADDED_COLUMNS = [
+  "font  TEXT    NOT NULL DEFAULT 'lato'",
+  "size  INTEGER NOT NULL DEFAULT 18",
+  "width TEXT    NOT NULL DEFAULT 'narrow'",
+];
+
 async function migrate() {
   await db.execute(SCHEMA);
   await db.execute(
     "CREATE INDEX IF NOT EXISTS posts_published_idx ON posts (published, published_at DESC)"
   );
+  for (const col of ADDED_COLUMNS) {
+    try {
+      await db.execute(`ALTER TABLE posts ADD COLUMN ${col}`);
+    } catch (e) {
+      if (!/duplicate column/i.test(String(e))) throw e;
+    }
+  }
 }
 
 export function ready(): Promise<void> {
@@ -54,7 +70,7 @@ export type Post = {
   created_at: string;
   updated_at: string;
   published_at: string | null;
-};
+} & Presentation;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPost(row: any): Post {
@@ -68,6 +84,7 @@ function toPost(row: any): Post {
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     published_at: row.published_at ? String(row.published_at) : null,
+    ...normalizePresentation(row),
   };
 }
 

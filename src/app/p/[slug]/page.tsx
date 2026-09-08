@@ -7,6 +7,7 @@ import { excerpt, formatDate, readingTime } from "@/lib/slug";
 import SiteHeader from "@/components/SiteHeader";
 import Markdown from "@/components/Markdown";
 import ReadingProgress from "@/components/ReadingProgress";
+import { presentationVars } from "@/lib/presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,8 @@ export default async function ArticlePage({ params }: Params) {
   const date = post.published_at ?? post.created_at;
 
   return (
-    <div className="min-h-dvh">
+    // The writer's typeface, size and measure travel with the post.
+    <div className="min-h-dvh" style={presentationVars(post)}>
       <ReadingProgress />
       <SiteHeader authed={authed} back={{ href: "/", label: "All writing" }} />
 
