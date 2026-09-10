@@ -3,12 +3,12 @@ import { listPublished } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
 import { excerpt, formatDate, readingTime } from "@/lib/slug";
 import SiteHeader from "@/components/SiteHeader";
+import { SITE_TAGLINE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const [posts, authed] = await Promise.all([listPublished(), isAuthed()]);
-  const tagline = process.env.NEXT_PUBLIC_SITE_TAGLINE || "writing, in the open";
 
   return (
     <div className="min-h-dvh">
@@ -16,7 +16,7 @@ export default async function Home() {
 
       <main className="mx-auto max-w-[var(--measure)] px-5 pb-24 sm:px-0">
         <div className="border-b border-rule-soft py-12 sm:py-16">
-          <p className="text-[15px] leading-relaxed text-ink-soft">{tagline}</p>
+          <p className="text-[15px] leading-relaxed text-ink-soft">{SITE_TAGLINE}</p>
         </div>
 
         {posts.length === 0 ? (

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Lato } from "next/font/google";
 import { PrefsProvider, PREFS_BOOTSTRAP } from "@/components/prefs";
+import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const lato = Lato({
@@ -11,12 +12,11 @@ const lato = Lato({
   variable: "--font-lato",
 });
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "writ";
-const tagline = process.env.NEXT_PUBLIC_SITE_TAGLINE || "writing, in the open";
-
 export const metadata: Metadata = {
-  title: { default: siteName, template: `%s — ${siteName}` },
-  description: tagline,
+  // Makes the Open Graph image URLs absolute, which link previews require.
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_NAME, template: `%s — ${SITE_NAME}` },
+  description: SITE_TAGLINE,
 };
 
 export const viewport: Viewport = {

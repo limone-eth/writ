@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { login, type LoginState } from "@/lib/actions";
+import { SITE_NAME } from "@/lib/site";
 
 export default function LoginForm() {
   const [state, formAction] = useActionState<LoginState, FormData>(login, {});
@@ -11,7 +12,7 @@ export default function LoginForm() {
   return (
     <form action={formAction} className="w-full max-w-[19rem] rise">
       <h1 className="text-[15px] font-bold tracking-tight text-ink">
-        {process.env.NEXT_PUBLIC_SITE_NAME || "writ"}
+        {SITE_NAME}
       </h1>
       <p className="mt-1 text-[13px] text-ink-faint">Only the author gets in.</p>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ReaderSettings from "./ReaderSettings";
+import { SITE_NAME } from "@/lib/site";
 
 export default function SiteHeader({
   authed,
@@ -8,8 +9,6 @@ export default function SiteHeader({
   authed: boolean;
   back?: { href: string; label: string };
 }) {
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "writ";
-
   return (
     <header className="sticky top-0 z-40 border-b border-rule-soft bg-paper/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[var(--measure)] items-center justify-between gap-4 px-5 sm:px-0">
@@ -34,7 +33,7 @@ export default function SiteHeader({
             href="/"
             className="text-[15px] font-bold tracking-tight text-ink transition-opacity hover:opacity-70"
           >
-            {siteName}
+            {SITE_NAME}
           </Link>
         )}
 

@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
 import { listPublished } from "@/lib/db";
+import { SITE_URL } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const base = SITE_URL;
   const posts = await listPublished();
   return [
     { url: base, lastModified: new Date() },

@@ -10,6 +10,7 @@ import ReadingProgress from "@/components/ReadingProgress";
 import { presentationVars } from "@/lib/presentation";
 import { headingsOf } from "@/lib/toc";
 import Toc from "@/components/Toc";
+import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,21 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const post = await getBySlug(slug);
   if (!post) return { title: "Not found" };
+  const title = post.title || "Untitled";
+  const description = post.subtitle || excerpt(post.content, 155);
+  // Absolute: a link preview should show the article's title alone, not
+  // the site name appended by the layout template.
   return {
-    title: post.title || "Untitled",
-    description: post.subtitle || excerpt(post.content, 155),
+    title: { absolute: title },
+    description,
+    openGraph: {
+      type: "article",
+      title,
+      description,
+      siteName: SITE_NAME,
+      publishedTime: post.published_at ?? undefined,
+    },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 

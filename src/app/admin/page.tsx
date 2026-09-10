@@ -3,6 +3,7 @@ import { listAll } from "@/lib/db";
 import { createDraft, logout } from "@/lib/actions";
 import { formatDate, wordCount } from "@/lib/slug";
 import ReaderSettings from "@/components/ReaderSettings";
+import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Desk" };
@@ -17,7 +18,7 @@ export default async function Desk() {
       <header className="sticky top-0 z-40 border-b border-rule-soft bg-paper/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[38rem] items-center justify-between px-5">
           <Link href="/" className="text-[15px] font-bold tracking-tight transition-opacity hover:opacity-70">
-            {process.env.NEXT_PUBLIC_SITE_NAME || "writ"}
+            {SITE_NAME}
           </Link>
           <div className="flex items-center gap-1">
             <form action={createDraft}>
