@@ -309,7 +309,7 @@ export default function Editor({ post }: { post: Post }) {
 
   return (
     <div
-      className="min-h-dvh pb-40"
+      className="min-h-dvh"
       style={presentationVars({ font, size, width })}
     >
       {/* top bar */}
@@ -386,16 +386,17 @@ export default function Editor({ post }: { post: Post }) {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_min(var(--measure),100%)_minmax(0,1fr)]">
         {outline.length >= 2 && (
           <aside className="toc-col hidden lg:block">
-            <div className="sticky top-24 ml-auto max-w-[13rem] pr-10 pt-24">
+            <div className="sticky top-20 ml-auto max-w-[13rem] pr-10">
               <Toc
                 items={outline}
+                maxHeight="calc(100dvh - 9rem)"
                 elementFor={headingElement}
                 linkable={false}
               />
             </div>
           </aside>
         )}
-        <main className="mx-auto w-full max-w-[var(--measure)] px-5 pt-24 lg:col-start-2">
+        <main className="mx-auto w-full max-w-[var(--measure)] px-5 pb-40 pt-24 lg:col-start-2">
           <GrowingField
             value={title}
             onChange={(v) => {

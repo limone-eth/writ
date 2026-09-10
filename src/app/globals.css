@@ -321,6 +321,36 @@
   .toc { display: none; }
 }
 
+/* The list scrolls on its own; the edges fade so a cut-off entry reads as
+   "more below" rather than a broken layout. The scrollbar stays out of the
+   way until the pointer is over the list. */
+.toc-scroll {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  padding-block: 6px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 6px,
+    #000 calc(100% - 14px),
+    transparent
+  );
+}
+.toc-scroll:hover {
+  scrollbar-color: var(--rule) transparent;
+}
+
+.toc-fold svg {
+  transition: transform 160ms ease;
+}
+.toc-fold[data-folded="true"] svg {
+  transform: rotate(-90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .toc-fold svg { transition: none; }
+}
+
 .toc-marker {
   position: absolute;
   left: -1.5px;

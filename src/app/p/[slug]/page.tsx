@@ -48,8 +48,8 @@ export default async function ArticlePage({ params }: Params) {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_min(var(--measure),100%)_minmax(0,1fr)]">
         {showToc && (
           <aside className="toc-col hidden lg:block">
-            <div className="sticky top-24 ml-auto max-w-[13rem] pr-10 pt-12 sm:pt-16">
-              <Toc items={toc} />
+            <div className="sticky top-20 ml-auto max-w-[13rem] pr-10">
+              <Toc items={toc} maxHeight="calc(100dvh - 6rem)" />
             </div>
           </aside>
         )}
