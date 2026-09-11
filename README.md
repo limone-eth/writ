@@ -20,6 +20,14 @@ chrome that fades away while you type.
   so the editor *is* the preview. `⌘B` / `⌘I` / `⌘S`, full undo/redo, a toolbar with live
   active states, inline link entry, autosave, word count, publish/unpublish, delete.
   Markdown remains the storage format: TipTap parses it in and serialises it back out.
+- **Import to read** (`/admin/import`): paste a link, text or HTML, or drop a PDF, and it
+  comes back as one clean article in a private **Library** on the Desk, read in the same
+  layout as a post (outline, progress bar, theme). The source is turned into rough Markdown
+  (links are fetched directly, then through [Jina Reader](https://jina.ai/reader) when a
+  publisher blocks servers; PDFs through their text layer), cut at headings into parts,
+  and each part is rewritten by a model on OpenRouter in parallel: site chrome and PDF
+  debris out, every sentence kept. A 30,000-word paper takes a minute or two. Imports are
+  read-only, never published, and 404 for everyone but you.
 - **Auth**: one password from an env var, an HMAC-signed httpOnly session cookie,
   30-day expiry. No user table, no signup route.
 - Mobile responsive throughout.
@@ -43,6 +51,9 @@ npm run dev
 | `NEXT_PUBLIC_SITE_NAME` | Shown in the header and `<title>`. |
 | `NEXT_PUBLIC_SITE_TAGLINE` | One line under the header on the list page. |
 | `NEXT_PUBLIC_SITE_URL` | Used by `sitemap.xml`. |
+| `OPENROUTER_API_KEY` | Needed for imports. |
+| `OPENROUTER_MODEL` | Optional. Defaults to `openai/gpt-5.6-luna`. |
+| `JINA_API_KEY` | Optional. Raises Jina Reader's rate limit for link imports. |
 
 The `posts` table is created on first query, so there is no migration step.
 `npm run seed` drops in a sample post.

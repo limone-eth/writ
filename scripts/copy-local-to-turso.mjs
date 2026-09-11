@@ -30,16 +30,25 @@ await remote.execute(
   "CREATE INDEX IF NOT EXISTS posts_published_idx ON posts (published, published_at DESC)"
 );
 
+// Imports must stay imports on the other side, or they would show up as drafts.
+for (const col of ["kind TEXT NOT NULL DEFAULT 'post'", "source TEXT NOT NULL DEFAULT ''"]) {
+  try {
+    await remote.execute(`ALTER TABLE posts ADD COLUMN ${col}`);
+  } catch (e) {
+    if (!/duplicate column/i.test(String(e))) throw e;
+  }
+}
+
 const { rows } = await local.execute("SELECT * FROM posts ORDER BY id");
 let copied = 0;
 for (const r of rows) {
   const res = await remote.execute({
-    sql: `INSERT INTO posts (slug, title, subtitle, content, published, created_at, updated_at, published_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO posts (slug, title, subtitle, content, published, created_at, updated_at, published_at, kind, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(slug) DO NOTHING`,
     args: [
       r.slug, r.title, r.subtitle, r.content, r.published,
-      r.created_at, r.updated_at, r.published_at,
+      r.created_at, r.updated_at, r.published_at, r.kind ?? "post", r.source ?? "",
     ],
   });
   if (res.rowsAffected > 0) copied++;

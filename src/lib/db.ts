@@ -39,6 +39,11 @@ const ADDED_COLUMNS = [
   "font  TEXT    NOT NULL DEFAULT 'lato'",
   "size  INTEGER NOT NULL DEFAULT 18",
   "width TEXT    NOT NULL DEFAULT 'narrow'",
+  // 'post' is written here; 'import' is someone else's article brought in
+  // for reading. Imports are never published and never edited.
+  "kind   TEXT   NOT NULL DEFAULT 'post'",
+  // Where an import came from: a URL, a file name, or empty for pasted text.
+  "source TEXT   NOT NULL DEFAULT ''",
 ];
 
 async function migrate() {
@@ -60,8 +65,12 @@ export function ready(): Promise<void> {
   return globalThis.__writDbReady;
 }
 
+export type Kind = "post" | "import";
+
 export type Post = {
   id: number;
+  kind: Kind;
+  source: string;
   slug: string;
   title: string;
   subtitle: string;
@@ -76,6 +85,8 @@ export type Post = {
 function toPost(row: any): Post {
   return {
     id: Number(row.id),
+    kind: row.kind === "import" ? "import" : "post",
+    source: String(row.source ?? ""),
     slug: String(row.slug),
     title: String(row.title ?? ""),
     subtitle: String(row.subtitle ?? ""),
@@ -100,6 +111,31 @@ export async function listAll(): Promise<Post[]> {
   await ready();
   const rs = await db.execute("SELECT * FROM posts ORDER BY updated_at DESC");
   return rs.rows.map(toPost);
+}
+
+export async function createImport(input: {
+  title: string;
+  subtitle: string;
+  content: string;
+  source: string;
+}): Promise<number> {
+  await ready();
+  const now = new Date().toISOString();
+  const rs = await db.execute({
+    sql: `INSERT INTO posts (kind, source, slug, title, subtitle, content, published, created_at, updated_at)
+          VALUES ('import', ?, ?, ?, ?, ?, 0, ?, ?) RETURNING id`,
+    // Imports live under /admin/library/<id>; the slug only has to be unique.
+    args: [
+      input.source,
+      `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      input.title,
+      input.subtitle,
+      input.content,
+      now,
+      now,
+    ],
+  });
+  return Number(rs.rows[0].id);
 }
 
 export async function getBySlug(slug: string): Promise<Post | null> {

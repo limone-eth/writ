@@ -312,6 +312,13 @@
 }
 .pop { animation: pop 160ms var(--ease-snap) both; }
 
+/* Before the part count is known, a short bar sweeps across the track. */
+@keyframes import-sweep {
+  from { transform: translateX(-100%) scaleX(0.3); }
+  to   { transform: translateX(100%) scaleX(0.3); }
+}
+.import-indeterminate { animation: import-sweep 1.3s var(--ease-glide) infinite; }
+
 /* ---------------------------------------------------------- outline */
 
 /* The outline column is a container so the outline can hide itself when

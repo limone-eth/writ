@@ -38,7 +38,8 @@ export default function SiteHeader({
         )}
 
         <div className="flex items-center gap-1">
-          {authed && (
+          {/* No second link to the Desk when the back link already goes there. */}
+          {authed && back?.href !== "/admin" && (
             <Link
               href="/admin"
               className="rounded-full px-2.5 py-2 text-[13px] text-ink-soft transition-colors duration-150 hover:bg-rule-soft hover:text-ink"

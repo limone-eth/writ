@@ -65,6 +65,7 @@ export async function savePost(input: {
   await ready();
   const post = await getById(input.id);
   if (!post) return { ok: false, error: "Post not found." };
+  if (post.kind === "import") return { ok: false, error: "Imported articles are read-only." };
 
   const title = input.title.trim();
   const now = new Date().toISOString();
@@ -93,7 +94,8 @@ export async function setPublished(id: number, published: boolean) {
   await requireAuth();
   await ready();
   const post = await getById(id);
-  if (!post) return;
+  // Imports are someone else's writing: they stay in the private library.
+  if (!post || post.kind === "import") return;
   const now = new Date().toISOString();
 
   if (published) {

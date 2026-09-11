@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listAll } from "@/lib/db";
 import { createDraft, logout } from "@/lib/actions";
-import { formatDate, wordCount } from "@/lib/slug";
+import { formatDate, readingTime, wordCount } from "@/lib/slug";
 import ReaderSettings from "@/components/ReaderSettings";
 import { SITE_NAME } from "@/lib/site";
 
@@ -10,8 +10,11 @@ export const metadata = { title: "Desk" };
 
 export default async function Desk() {
   const posts = await listAll();
-  const drafts = posts.filter((p) => !p.published);
-  const published = posts.filter((p) => p.published);
+  const drafts = posts.filter((p) => p.kind === "post" && !p.published);
+  const published = posts.filter((p) => p.kind === "post" && p.published);
+  const library = posts
+    .filter((p) => p.kind === "import")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   return (
     <div className="min-h-dvh">
@@ -21,6 +24,12 @@ export default async function Desk() {
             {SITE_NAME}
           </Link>
           <div className="flex items-center gap-1">
+            <Link
+              href="/admin/import"
+              className="flex h-8 items-center rounded-full px-3 text-[13px] text-ink-soft transition-[color,background-color,transform] duration-150 ease-snap hover:bg-rule-soft hover:text-ink active:scale-[0.96]"
+            >
+              Import
+            </Link>
             <form action={createDraft}>
               <button
                 type="submit"
@@ -58,6 +67,19 @@ export default async function Desk() {
           ))}
         </Group>
 
+        <Group title="Library" count={library.length} empty="Articles you import to read show up here.">
+          {library.map((p) => (
+            <Row
+              key={p.id}
+              href={`/admin/library/${p.id}`}
+              title={p.title || "Untitled"}
+              meta={[sourceName(p.source), `${readingTime(p.content)} min`, `imported ${formatDate(p.created_at)}`]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+          ))}
+        </Group>
+
         <form action={logout} className="mt-14 border-t border-rule-soft pt-6">
           <button type="submit" className="text-[12px] text-ink-faint transition-colors hover:text-ink">
             Sign out
@@ -68,13 +90,23 @@ export default async function Desk() {
   );
 }
 
+function sourceName(source: string): string {
+  try {
+    return new URL(source).hostname.replace(/^www\./, "");
+  } catch {
+    return source;
+  }
+}
+
 function Group({
   title,
   count,
+  empty = "Nothing here.",
   children,
 }: {
   title: string;
   count: number;
+  empty?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -83,7 +115,7 @@ function Group({
         {title} <span className="tabular font-normal">{count}</span>
       </div>
       {count === 0 ? (
-        <p className="py-5 text-[14px] text-ink-faint">Nothing here.</p>
+        <p className="py-5 text-[14px] text-ink-faint">{empty}</p>
       ) : (
         <ul className="divide-y divide-rule-soft">{children}</ul>
       )}
