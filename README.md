@@ -20,6 +20,11 @@ chrome that fades away while you type.
   so the editor *is* the preview. `⌘B` / `⌘I` / `⌘S`, full undo/redo, a toolbar with live
   active states, inline link entry, autosave, word count, publish/unpublish, delete.
   Markdown remains the storage format: TipTap parses it in and serialises it back out.
+- **Images**: drop one on the page, paste a screenshot, or pick a file from the toolbar.
+  It appears straight away and uploads from the browser to Vercel Blob, so a photo never
+  passes through a server function and is not held to Vercel's request size limit. Click a
+  picture and the bottom bar becomes its description: one sentence that is both the
+  Markdown alt text and the caption printed under it. Deleting a post deletes its images.
 - **Import to read** (`/admin/import`): paste a link, text or HTML, or drop a PDF, and it
   comes back as one clean article in a private **Library** on the Desk, read in the same
   layout as a post (outline, progress bar, theme). The source is turned into rough Markdown
@@ -51,6 +56,7 @@ npm run dev
 | `NEXT_PUBLIC_SITE_NAME` | Shown in the header and `<title>`. |
 | `NEXT_PUBLIC_SITE_TAGLINE` | One line under the header on the list page. |
 | `NEXT_PUBLIC_SITE_URL` | Used by `sitemap.xml`. |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob store that holds article images. Set by `vercel blob create-store`. |
 | `OPENROUTER_API_KEY` | Needed for imports. |
 | `OPENROUTER_MODEL` | Optional. Defaults to `openai/gpt-5.6-luna`. |
 | `JINA_API_KEY` | Optional. Raises Jina Reader's rate limit for link imports. |
@@ -75,6 +81,18 @@ work. `npm run db:push-local` copies anything written to that local file up into
 
 Inspect the live data with `turso db shell writ`.
 
+### Images
+
+Pictures live in the Vercel Blob store `writ-images`, under `posts/<id>/`:
+
+```bash
+vercel blob create-store writ-images --access public   # -> BLOB_READ_WRITE_TOKEN
+vercel blob list                                       # what is in there
+```
+
+Creating the store links it to the project and writes the token into `.env.local`.
+Without the token the editor still runs; it just refuses image uploads.
+
 ## Writing
 
 1. `/login`, enter the password.
@@ -89,11 +107,12 @@ Unpublished posts are readable at their URL while you're signed in, marked
 ## Deploying
 
 Set the four required env vars — `AUTH_PASSWORD`, `SESSION_SECRET`, `TURSO_DATABASE_URL`,
-`TURSO_AUTH_TOKEN` — and deploy. Every route that touches the database is `force-dynamic`, so no build-time
+`TURSO_AUTH_TOKEN` — connect the Blob store, and deploy. Every route that touches the database is `force-dynamic`, so no build-time
 database access is needed.
 
 ## Stack
 
 Next.js 15 (App Router, server actions) · React 19 · Tailwind v4 · libSQL/Turso ·
-TipTap 3 + tiptap-markdown (editor) · react-markdown + remark-gfm (published pages).
+Vercel Blob (images) · TipTap 3 + tiptap-markdown (editor) ·
+react-markdown + remark-gfm (published pages).
 No client-side state library, no auth library, no CMS.

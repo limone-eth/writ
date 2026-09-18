@@ -254,6 +254,20 @@
     outline-offset: -1px;
   }
 
+  /* A picture stands slightly apart from the text it interrupts, and its
+     caption sits close under it in the smaller, quieter voice of an aside. */
+  .prose figure {
+    margin-top: 2em;
+    margin-bottom: 2em;
+  }
+  .prose figure img { display: block; }
+  .prose figcaption {
+    margin-top: 0.6em;
+    font-size: 0.82em;
+    line-height: 1.5;
+    color: var(--ink-faint);
+  }
+
   .prose table {
     width: 100%;
     border-collapse: collapse;
@@ -288,6 +302,17 @@
   .writing-body a { cursor: text; }
   .writing-body:focus-visible { outline: none; }
 
+  /* A picture is picked up whole, not typed into: click it and the bottom
+     bar turns into its description field. */
+  .writing-body :is(img, figure, figcaption) { cursor: default; }
+  .writing-body :is(img, figure).ProseMirror-selectednode {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* Still a local file, so still on its way up. */
+  .writing-body img[src^="blob:"] { animation: uploading 1.4s ease-in-out infinite; }
+
   .fade-chrome {
     transition: opacity 320ms var(--ease-snap);
   }
@@ -304,6 +329,11 @@
   to   { opacity: 1; transform: none; }
 }
 .rise { animation: rise 420ms var(--ease-snap) both; }
+
+@keyframes uploading {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.75; }
+}
 
 /* Popovers scale from their trigger, never from the middle of the page. */
 @keyframes pop {

@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { del, list } from "@vercel/blob";
 import { db, ready, getById } from "./db";
 import { checkPassword, createSession, destroySession, requireAuth } from "./auth";
+import { imagePrefix } from "./images";
 import { slugify } from "./slug";
 import { normalizePresentation, type Presentation } from "./presentation";
 
@@ -116,11 +118,27 @@ export async function setPublished(id: number, published: boolean) {
   revalidatePath(`/p/${post.slug}`);
 }
 
+/**
+ * Every image of a post is stored under its own prefix, so a deleted post
+ * takes its pictures with it instead of leaving them paid for and unreachable.
+ * A failure here must not stop the post from being deleted.
+ */
+async function deleteImages(postId: number) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  try {
+    const { blobs } = await list({ prefix: imagePrefix(postId) });
+    if (blobs.length > 0) await del(blobs.map((b) => b.url));
+  } catch (e) {
+    console.error("[images] could not clean up post", postId, e);
+  }
+}
+
 export async function deletePost(id: number) {
   await requireAuth();
   await ready();
   const post = await getById(id);
   await db.execute({ sql: "DELETE FROM posts WHERE id = ?", args: [id] });
+  await deleteImages(id);
   revalidatePath("/");
   revalidatePath("/admin");
   if (post) revalidatePath(`/p/${post.slug}`);

@@ -20,8 +20,18 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder, CharacterCount } from "@tiptap/extensions";
 import { Markdown } from "tiptap-markdown";
+import { upload } from "@vercel/blob/client";
 import { Callout } from "./Callout";
+import { ArticleImage } from "./ArticleImage";
 import { deletePost, savePost, setPublished } from "@/lib/actions";
+import {
+  IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  imageFilesFrom,
+  imagePathname,
+  isImage,
+} from "@/lib/images";
 import { usePrefs } from "./prefs";
 import {
   FONTS,
@@ -59,6 +69,8 @@ export default function Editor({ post }: { post: Post }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const [words, setWords] = useState(0);
+  const [uploading, setUploading] = useState(0);
+  const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
 
   const dirty = useRef(false);
@@ -67,6 +79,9 @@ export default function Editor({ post }: { post: Post }) {
   const editorRef = useRef<TipTapEditor | null>(null);
   const linkInput = useRef<HTMLInputElement>(null);
   const subtitleInput = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  // Counted rather than a flag: several images can be in flight at once.
+  const inFlight = useRef(0);
 
   const titleRef = useRef(title);
   const subtitleRef = useRef(subtitle);
@@ -79,6 +94,9 @@ export default function Editor({ post }: { post: Post }) {
 
   const flush = useCallback(async () => {
     if (!dirty.current) return;
+    // An image still uploading sits in the document as a blob: URL, which
+    // dies with the tab. Wait: the upload calls touch() when it settles.
+    if (inFlight.current > 0) return;
     dirty.current = false;
     setState("saving");
     const res = await savePost({
@@ -117,6 +135,87 @@ export default function Editor({ post }: { post: Post }) {
     touch();
   };
 
+  /* --------------------------------------------------------- images */
+
+  /** Points every copy of one src at another, or removes the node for null. */
+  const swapImage = useCallback((from: string, to: string | null) => {
+    const view = editorRef.current?.view;
+    if (!view) return;
+    let tr = view.state.tr;
+    let found = false;
+    view.state.doc.descendants((node, pos) => {
+      if (found || node.type.name !== "image" || node.attrs.src !== from) return;
+      found = true;
+      tr = to
+        ? tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: to })
+        : tr.delete(pos, pos + node.nodeSize);
+    });
+    // Off the undo stack: undoing back to a dead blob: URL helps nobody.
+    if (found) view.dispatch(tr.setMeta("addToHistory", false));
+  }, []);
+
+  /**
+   * Shows each image straight away from a local URL, uploads them to Blob in
+   * parallel, then swaps in the real address. A failed one is taken back out.
+   */
+  const addImages = useCallback(
+    async (files: File[], at?: number) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const queue: { file: File; local: string }[] = [];
+      for (const file of files) {
+        if (!isImage(file)) continue;
+        if (file.size > MAX_IMAGE_BYTES) {
+          setNotice(`${file.name} is over ${MAX_IMAGE_MB} MB.`);
+          continue;
+        }
+        queue.push({ file, local: URL.createObjectURL(file) });
+      }
+      if (queue.length === 0) return;
+
+      const chain = editor.chain().focus(at);
+      for (const { local } of queue) chain.setImage({ src: local });
+      chain.run();
+
+      inFlight.current += queue.length;
+      setUploading((n) => n + queue.length);
+
+      await Promise.all(
+        queue.map(async ({ file, local }) => {
+          try {
+            const blob = await upload(imagePathname(post.id, file.name), file, {
+              access: "public",
+              contentType: file.type,
+              handleUploadUrl: "/api/upload",
+            });
+            swapImage(local, blob.url);
+          } catch (e) {
+            swapImage(local, null);
+            setNotice(
+              e instanceof Error && e.message
+                ? `Could not upload ${file.name}: ${e.message}`
+                : `Could not upload ${file.name}.`,
+            );
+          } finally {
+            URL.revokeObjectURL(local);
+            inFlight.current -= 1;
+            setUploading((n) => n - 1);
+            touch();
+          }
+        }),
+      );
+    },
+    [post.id, swapImage, touch],
+  );
+
+  // The notice is a passing remark, not a state to sit in.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(""), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
   /* -------------------------------------------------------- the editor */
 
   const editor = useEditor({
@@ -128,6 +227,7 @@ export default function Editor({ post }: { post: Post }) {
         blockquote: false, // replaced by Callout below
       }),
       Callout,
+      ArticleImage,
       Markdown.configure({
         html: false,
         transformPastedText: true,
@@ -146,6 +246,25 @@ export default function Editor({ post }: { post: Post }) {
         class: "prose writing-body",
         "aria-label": "Article body",
         spellcheck: "true",
+      },
+      // A screenshot on the clipboard becomes a picture in the article.
+      handlePaste: (_view, event) => {
+        const files = imageFilesFrom(event.clipboardData);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        void addImages(files);
+        return true;
+      },
+      // Files dropped from the desktop; dragging an image already in the
+      // document is ProseMirror's own move, so it is left alone.
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = imageFilesFrom(event.dataTransfer);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        void addImages(files, at?.pos);
+        return true;
       },
     },
     onCreate: ({ editor: e }) => setWords(e.storage.characterCount.words()),
@@ -175,9 +294,24 @@ export default function Editor({ post }: { post: Post }) {
             list: e.isActive("bulletList"),
             code: e.isActive("code"),
             link: e.isActive("link"),
+            // True while a picture is the selection, which turns the bottom
+            // bar into the field for its description. Flat values only: a
+            // fresh object here would be a new snapshot on every keystroke.
+            image: e.isActive("image"),
+            alt: e.isActive("image") ? String(e.getAttributes("image").alt ?? "") : "",
           }
         : null,
   });
+
+  const imageSelected = live?.image ?? false;
+
+  // The description field reads straight from the document, so there is one
+  // copy of the text rather than a local one to keep in step with it.
+  const setAlt = (value: string) => {
+    // No .focus(): the caret belongs in the field being typed into.
+    editorRef.current?.commands.updateAttributes("image", { alt: value });
+    touch();
+  };
 
   // Outline of the live document, refreshed on document changes only.
   // Entries are matched to DOM headings by order, since editor headings
@@ -301,6 +435,12 @@ export default function Editor({ post }: { post: Post }) {
     saved: "Saved",
     error: "Save failed — retrying on next edit",
   };
+  const status =
+    uploading > 0
+      ? uploading === 1
+        ? "Uploading image…"
+        : `Uploading ${uploading} images…`
+      : label[state];
 
   const cmd = (fn: () => void) => () => {
     fn();
@@ -346,7 +486,7 @@ export default function Editor({ post }: { post: Post }) {
                         : "bg-rule",
                 ].join(" ")}
               />
-              {label[state]}
+              {status}
             </span>
 
             {published && (
@@ -424,6 +564,18 @@ export default function Editor({ post }: { post: Post }) {
           />
 
           <EditorContent editor={editor} className="mt-10" />
+
+          <input
+            ref={fileInput}
+            type="file"
+            accept={IMAGE_TYPES.join(",")}
+            multiple
+            hidden
+            onChange={(e) => {
+              void addImages(Array.from(e.target.files ?? []));
+              e.target.value = ""; // so the same file can be picked twice
+            }}
+          />
         </main>
       </div>
 
@@ -435,6 +587,14 @@ export default function Editor({ post }: { post: Post }) {
         {/* Wider than the writing column on purpose: every control has to be
             reachable without scrolling the bar on a desktop screen. */}
         <div className="mx-auto max-w-[52rem] px-1.5 py-2">
+          {notice && (
+            <p
+              role="status"
+              className="pop mb-1.5 px-2.5 text-[12px] leading-snug text-accent"
+            >
+              {notice}
+            </p>
+          )}
           {linkOpen ? (
             <div className="flex items-center gap-2">
               <input
@@ -466,6 +626,35 @@ export default function Editor({ post }: { post: Post }) {
                 Cancel
               </button>
             </div>
+          ) : imageSelected ? (
+            /* A selected picture turns the bar into its description field:
+               the alt text, which is what a screen reader reads out and what
+               stands in when the image will not load. */
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 pl-1.5 text-[12px] text-ink-faint">
+                Describe
+              </span>
+              <input
+                value={live?.alt ?? ""}
+                onChange={(e) => setAlt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    editor?.chain().focus().run();
+                  }
+                }}
+                placeholder="What is in this image?"
+                aria-label="Image description"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-rule bg-paper px-2.5 text-[13px] outline-none placeholder:text-ink-faint focus:border-ink-faint"
+              />
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().deleteSelection().run()}
+                className="h-8 shrink-0 rounded-lg px-2 text-[12px] text-ink-faint transition-colors duration-150 hover:bg-rule-soft hover:text-accent"
+              >
+                Remove
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-1 overflow-x-auto px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <Tool
@@ -486,6 +675,12 @@ export default function Editor({ post }: { post: Post }) {
               </Tool>
               <Tool label="Link" active={live?.link} onClick={openLink}>
                 <LinkIcon />
+              </Tool>
+              <Tool
+                label="Image — or paste or drop one into the page"
+                onClick={() => fileInput.current?.click()}
+              >
+                <ImageIcon />
               </Tool>
               {([1, 2, 3] as const).map((level) => (
                 <Tool
@@ -707,6 +902,36 @@ function LinkIcon() {
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="3"
+        y="5"
+        width="18"
+        height="14"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle cx="8.5" cy="10" r="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M4 17l4.5-4.5a1.5 1.5 0 012 0L15 16m0 0l2-1.8a1.5 1.5 0 012 0L20.5 16"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
